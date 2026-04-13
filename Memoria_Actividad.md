@@ -1,6 +1,6 @@
 # Memoria de la Actividad 3: Uso de una API en aplicación de componentes
 
-**Nombre del Alumno:** [Tu Nombre / Apellidos]
+**Nombre del Alumno:** [Guillermo de Jesus Luna Sanchez]
 
 ---
 

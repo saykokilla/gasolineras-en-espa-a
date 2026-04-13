@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buscador de Gasolineras API</title>
+    <!-- Using Tailwind CSS via CDN for Premium Styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: '#3b82f6',
+                        secondary: '#1e293b',
+                        accent: '#f59e0b',
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Vue 3 via CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Axios for AJAX -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+        }
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.5s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+    </style>
+</head>
+<body class="text-secondary min-h-screen flex flex-col">
+
+    <div id="app" class="flex-grow flex flex-col">
+        <!-- Header -->
+        <header class="bg-gradient-to-r from-blue-600 to-indigo-700 text-white shadow-lg py-6">
+            <div class="container mx-auto px-4 flex justify-between items-center">
+                <h1 class="text-3xl font-bold tracking-tight">⛽ GeoGasolineras España</h1>
+                <p class="text-blue-100 hidden sm:block">Datos oficiales en tiempo real</p>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="container mx-auto px-4 py-8 flex-grow">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <!-- Data Entry Component -->
+                <div class="lg:col-span-1">
+                    <div class="glass-panel p-6 rounded-2xl border border-gray-100">
+                        <h2 class="text-xl font-semibold mb-4 text-gray-800 border-b pb-2">📍 Parámetros de Búsqueda</h2>
+                        
+                        <form @submit.prevent="fetchGasolineras" class="space-y-4">
+                            
+                            <!-- Geolocator Button -->
+                            <div class="pt-2">
+                                <button type="button" @click="getLocation" class="w-full bg-blue-50 text-blue-600 hover:bg-blue-100 font-medium py-2 px-4 rounded-lg flex items-center justify-center transition duration-200 shadow-sm border border-blue-200">
+                                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                                    Obtener mi ubicación actual
+                                </button>
+                                <p v-if="locationError" class="text-red-500 text-xs mt-1">{{ locationError }}</p>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Latitud</label>
+                                    <input type="number" step="any" v-model="form.lat" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Longitud</label>
+                                    <input type="number" step="any" v-model="form.lon" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Radio de búsqueda (km)</label>
+                                <input type="range" min="1" max="50" v-model="form.radius" class="w-full accent-blue-600">
+                                <div class="text-right text-sm font-bold text-blue-600">{{ form.radius }} km</div>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Tipo de Carburante</label>
+                                <select v-model="form.fuelType" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition bg-white">
+                                    <option value="Precio Gasolina 95 E5">Gasolina 95 E5</option>
+                                    <option value="Precio Gasolina 98 E5">Gasolina 98 E5</option>
+                                    <option value="Precio Gasoleo A">Gasóleo A (Diesel)</option>
+                                    <option value="Precio Gasoleo Premium">Gasóleo Premium</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Filtrar por Marca (Opcional)</label>
+                                <input type="text" v-model="form.brand" placeholder="Ej: REPSOL, CEPSA..." class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition">
+                            </div>
+
+                            <button type="submit" :disabled="loading" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition duration-200 shadow-md disabled:opacity-50">
+                                <span v-if="loading">Calculando opciones...</span>
+                                <span v-else>Buscar Gasolineras Rápidas</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Outputs / Results Area -->
+                <div class="lg:col-span-2">
+                    
+                    <!-- Empty State -->
+                    <div v-if="!results_data && !loading" class="h-full flex flex-col items-center justify-center text-gray-400 py-12 glass-panel rounded-2xl border border-gray-100 p-6 text-center">
+                        <svg class="w-20 h-20 mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        <h3 class="text-xl font-medium text-gray-500">Esperando área a consultar</h3>
+                        <p class="mt-2 text-sm">Introduce tus coordenadas o usa el botòn de ubicación para encontrar las mejores opciones.</p>
+                    </div>
+
+                    <!-- Loader -->
+                    <div v-if="loading" class="h-full flex flex-col items-center justify-center py-12">
+                        <div class="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-600 mb-4"></div>
+                        <p class="text-gray-600 animate-pulse font-medium">Buscando ofertas del estado...</p>
+                    </div>
+
+                    <transition name="fade">
+                        <div v-if="results_data && !loading" class="space-y-6">
+                            
+                            <div class="flex items-center justify-between">
+                                <h2 class="text-2xl font-bold text-gray-800">Resultados de Muestra</h2>
+                                <span class="bg-blue-100 text-blue-800 text-sm font-semibold px-3 py-1 rounded-full"><span class="font-bold">{{ results_data.total }}</span> estaciones encontradas</span>
+                            </div>
+
+                            <!-- Highlights -->
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <!-- Closest -->
+                                <div v-if="results_data.closest" class="bg-gradient-to-br from-teal-500 to-emerald-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                                    <div class="absolute top-0 right-0 p-4 opacity-20">
+                                        <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"></path></svg>
+                                    </div>
+                                    <h3 class="text-sm font-semibold text-teal-100 uppercase tracking-wider mb-1">🏆 Gasolinera Más Cercana</h3>
+                                    <p class="text-xl font-bold mb-2">{{ results_data.closest.name }}</p>
+                                    <div class="flex items-end justify-between relative z-10">
+                                        <div>
+                                            <p class="text-3xl font-black">{{ results_data.closest.distance }} <span class="text-lg font-medium">km</span></p>
+                                            <p class="text-sm text-teal-100 mt-1">{{ results_data.closest.address }}</p>
+                                        </div>
+                                        <div class="text-right">
+                                            <p class="text-2xl font-bold">{{ results_data.closest.price }}€</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Cheapest -->
+                                <div v-if="results_data.cheapest" class="bg-gradient-to-br from-amber-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+                                    <div class="absolute top-0 right-0 p-4 opacity-20">
+                                        <svg class="w-24 h-24" fill="currentColor" viewBox="0 0 20 20"><path d="M8.433 7.418c.155-.103.346-.196.567-.267v1.698a2.305 2.305 0 01-.567-.267C8.07 8.34 8 8.114 8 8c0-.114.07-.34.433-.582zM11 12.849v-1.698c.22.071.412.164.567.267.364.243.433.468.433.582 0 .114-.07.34-.433.582a2.305 2.305 0 01-.567.267z"></path><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-13a1 1 0 10-2 0v.092a4.535 4.535 0 00-1.676.662C6.602 6.234 6 7.009 6 8c0 .99.602 1.765 1.324 2.246.48.32 1.054.545 1.676.662v1.906c-.253-.053-.508-.146-.748-.282a1 1 0 10-1.054 1.732c.436.264.915.465 1.426.592V15a1 1 0 102 0v-.092a4.535 4.535 0 001.676-.662C13.398 13.766 14 12.991 14 12c0-.99-.602-1.765-1.324-2.246A4.535 4.535 0 0011 9.092V7.186c.253.052.508.146.748.282a1 1 0 101.054-1.732A5.916 5.916 0 0011 5.092V5z" clip-rule="evenodd"></path></svg>
+                                    </div>
+                                    <h3 class="text-sm font-semibold text-amber-100 uppercase tracking-wider mb-1">💰 Gasolinera Más Barata</h3>
+                                    <p class="text-xl font-bold mb-2">{{ results_data.cheapest.name }}</p>
+                                    <div class="flex items-end justify-between relative z-10">
+                                        <div>
+                                            <p class="text-3xl font-black">{{ results_data.cheapest.price }}<span class="text-lg font-medium tracking-normal text-amber-100"> €/L</span></p>
+                                            <p class="text-sm text-amber-100 mt-1">a {{ results_data.cheapest.distance }} km de ti</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Full List -->
+                            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                                <ul class="divide-y divide-gray-100">
+                                    <li v-for="estacion in results_data.results" :key="estacion.id" class="p-5 hover:bg-gray-50 transition duration-150">
+                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between">
+                                            
+                                            <div class="mb-3 sm:mb-0">
+                                                <div class="flex items-center space-x-2">
+                                                    <h4 class="text-lg font-bold text-gray-800">{{ estacion.name || 'Sin Rótulo' }}</h4>
+                                                    <span v-if="estacion.is_open" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800">
+                                                        <span class="w-2 h-2 mr-1 bg-green-500 rounded-full animate-pulse"></span> Abierta
+                                                    </span>
+                                                    <span v-else class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                                                        Cerrada o N/D
+                                                    </span>
+                                                </div>
+                                                <p class="text-sm text-gray-500 mt-1">{{ estacion.address }}, {{ estacion.municipality }}</p>
+                                                <p class="text-xs text-gray-400 mt-1">Horario: {{ estacion.schedule }}</p>
+                                            </div>
+                                            
+                                            <div class="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center">
+                                                <div class="text-2xl font-black text-gray-900">{{ estacion.price }}<span class="text-base text-gray-500 font-normal">€</span></div>
+                                                <div class="text-sm font-semibold text-blue-600 mt-1">{{ estacion.distance }} km</div>
+                                            </div>
+                                        </div>
+                                    </li>
+                                </ul>
+                            </div>
+                            
+                        </div>
+                    </transition>
+
+                </div>
+            </div>
+        </main>
+
+        <footer class="bg-white border-t py-6 mt-8">
+            <div class="container mx-auto px-4 text-center text-gray-500 text-sm">
+                <p>Datos proporcionados por el Ministerio para la Transformación Digital y Función Pública.</p>
+                <p class="mt-1">GeoGasolineras App &copy; 2026</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- App Script -->
+    <script>
+        const { createApp } = Vue
+
+        createApp({
+            data() {
+                return {
+                    form: {
+                        lat: '',
+                        lon: '',
+                        radius: 5,
+                        fuelType: 'Precio Gasolina 95 E5',
+                        brand: ''
+                    },
+                    loading: false,
+                    results_data: null,
+                    locationError: ''
+                }
+            },
+            methods: {
+                getLocation() {
+                    this.locationError = '';
+                    if (navigator.geolocation) {
+                        navigator.geolocation.getCurrentPosition(
+                            (position) => {
+                                this.form.lat = position.coords.latitude;
+                                this.form.lon = position.coords.longitude;
+                            },
+                            (error) => {
+                                console.error(error);
+                                this.locationError = "No se pudo acceder a la ubicación. Ingresa los datos manualmente.";
+                            }
+                        );
+                    } else {
+                        this.locationError = "La geolocalización no es compatible con tu navegador.";
+                    }
+                },
+                async fetchGasolineras() {
+                    this.loading = true;
+                    this.results_data = null;
+                    try {
+                        const response = await axios.get('/api/gasolineras', {
+                            params: {
+                                lat: this.form.lat,
+                                lon: this.form.lon,
+                                radius: this.form.radius,
+                                fuel_type: this.form.fuelType,
+                                brand: this.form.brand
+                            }
+                        });
+                        this.results_data = response.data;
+                    } catch (error) {
+                        console.error('Error fetching gasolineras:', error);
+                        alert("Ocurrió un error al consultar las gasolineras: " + (error.response?.data?.error || error.message));
+                    } finally {
+                        this.loading = false;
+                    }
+                }
+            }
+        }).mount('#app')
+    </script>
+</body>
+</html>
